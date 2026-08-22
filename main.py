@@ -90,64 +90,83 @@ class UpdateProfileRequest(BaseModel):
 
     # =====================================================
     # PERSONAL INFORMATION
-    # Employee can update these
     # =====================================================
 
     mobile: Optional[str] = None
+
     date_of_birth: Optional[str] = None
+
     nationality: Optional[str] = None
+
+    # Existing backend field
     address: Optional[str] = None
+
+    # Frontend-friendly field
+    residential_address: Optional[str] = None
 
     # =====================================================
     # RESUME INFORMATION
-    # Employee can update these
     # =====================================================
 
     about: Optional[str] = None
+
     skills: Optional[str] = None
+
     certifications: Optional[str] = None
+
     experience: Optional[str] = None
 
     # =====================================================
     # WORK INFORMATION
-    # Admin can update these
     # =====================================================
 
     company: Optional[str] = None
+
     department: Optional[str] = None
+
     manager: Optional[str] = None
+
     location: Optional[str] = None
 
     job_position: Optional[str] = None
+
     joining_date: Optional[str] = None
 
     # =====================================================
     # SALARY INFORMATION
-    # Admin only
     # =====================================================
 
     basic_salary: Optional[float] = None
+
     hra: Optional[float] = None
+
     allowances: Optional[float] = None
+
     deductions: Optional[float] = None
+
     gross_salary: Optional[float] = None
+
     net_salary: Optional[float] = None
 
     # =====================================================
     # BANK INFORMATION
-    # Admin only
     # =====================================================
 
     bank_name: Optional[str] = None
+
     account_number: Optional[str] = None
+
     ifsc_code: Optional[str] = None
 
 
 class LeaveRequest(BaseModel):
 
     leave_type: str
+
     start_date: str
+
     end_date: str
+
     reason: Optional[str] = ""
 
 
@@ -156,6 +175,24 @@ class LeaveRequest(BaseModel):
 # =========================================================
 
 def employee_response(employee):
+
+    address = employee.get(
+        "address",
+        ""
+    )
+
+    residential_address = employee.get(
+        "residential_address",
+        ""
+    )
+
+    # Keep both fields synchronized
+    # for frontend compatibility.
+    if not residential_address:
+        residential_address = address
+
+    if not address:
+        address = residential_address
 
     return {
 
@@ -211,10 +248,10 @@ def employee_response(employee):
             ""
         ),
 
-        "address": employee.get(
-            "address",
-            ""
-        ),
+        "address": address,
+
+        "residential_address":
+            residential_address,
 
         # -------------------------------------------------
         # RESUME INFORMATION
@@ -528,6 +565,7 @@ def create_employee_code(
         )
 
     first_name = parts[0]
+
     last_name = parts[-1]
 
     return (
@@ -899,6 +937,9 @@ def signup(
             "",
 
         "address":
+            "",
+
+        "residential_address":
             "",
 
         # -------------------------------------------------
@@ -1291,20 +1332,19 @@ def get_my_profile(
 
 # =========================================================
 # UPDATE MY PROFILE
-# EMPLOYEE ONLY
 #
-# Employee can update:
+# EMPLOYEE CAN EDIT:
 #
 # - Mobile
 # - Date of Birth
 # - Nationality
-# - Address
+# - Residential Address
 # - About
 # - Skills
 # - Certifications
 # - Experience
 #
-# Employee CANNOT update:
+# EMPLOYEE CANNOT EDIT:
 #
 # - Company
 # - Department
@@ -1313,7 +1353,7 @@ def get_my_profile(
 # - Job Position
 # - Joining Date
 # - Salary
-# - Bank Information
+# - Bank
 # =========================================================
 
 @app.put("/me/profile")
@@ -1355,31 +1395,7 @@ def update_my_profile(
     )
 
     # -----------------------------------------------------
-    # FIELDS EMPLOYEE IS ALLOWED TO CHANGE
-    # -----------------------------------------------------
-
-    employee_editable_fields = {
-
-        "mobile",
-
-        "date_of_birth",
-
-        "nationality",
-
-        "address",
-
-        "about",
-
-        "skills",
-
-        "certifications",
-
-        "experience"
-
-    }
-
-    # -----------------------------------------------------
-    # FIELDS EMPLOYEE IS NOT ALLOWED TO CHANGE
+    # PROTECTED FIELDS
     # -----------------------------------------------------
 
     protected_fields = {
@@ -1406,13 +1422,7 @@ def update_my_profile(
 
         "gross_salary",
 
-        "net_salary",
-
-        "bank_name",
-
-        "account_number",
-
-        "ifsc_code"
+        "net_salary"
 
     }
 
@@ -1434,29 +1444,74 @@ def update_my_profile(
 
             detail=(
                 "You can only update your "
-                "personal and resume information. "
-                "Work, salary and bank information "
+                "personal, resume and bank information. "
+                "Work and salary information "
                 "can only be updated by Admin."
             )
 
         )
 
     # -----------------------------------------------------
-    # KEEP ONLY ALLOWED EMPLOYEE FIELDS
+    # EMPLOYEE EDITABLE FIELDS
     # -----------------------------------------------------
+
+    employee_editable_fields = {
+
+        "mobile",
+
+        "date_of_birth",
+
+        "nationality",
+
+        "address",
+
+        "residential_address",
+
+        "about",
+
+        "skills",
+
+        "certifications",
+
+        "experience",
+
+        "bank_name",
+
+        "account_number",
+
+        "ifsc_code"
+
+    }
 
     updates = {
 
         field: value
 
-        for field, value in submitted_updates.items()
+        for field, value
+        in submitted_updates.items()
 
         if field in employee_editable_fields
 
     }
 
     # -----------------------------------------------------
-    # SAVE TO MONGODB
+    # KEEP ADDRESS FIELDS SYNCHRONIZED
+    # -----------------------------------------------------
+
+    if "residential_address" in updates:
+
+        updates["address"] = (
+            updates["residential_address"]
+        )
+
+    elif "address" in updates:
+
+        updates["residential_address"] = (
+            updates["address"]
+        )
+
+    # -----------------------------------------------------
+    # SAVE
     # -----------------------------------------------------
 
     if updates:
@@ -1492,7 +1547,7 @@ def update_my_profile(
             "Profile Updated",
 
             (
-                "Your personal profile "
+                "Your personal and resume "
                 "information has been "
                 "updated successfully."
             ),
@@ -1502,7 +1557,7 @@ def update_my_profile(
         )
 
     # -----------------------------------------------------
-    # RETURN UPDATED DATA
+    # RETURN FRESH EMPLOYEE
     # -----------------------------------------------------
 
     updated_employee = (
@@ -1578,15 +1633,11 @@ def get_employees(
 #
 # Admin can update:
 #
-# - Personal information
-# - Resume information
-# - Department
-# - Job Position
-# - Manager
-# - Location
-# - Joining Date
+# - Personal
+# - Resume
+# - Work
 # - Salary
-# - Bank Information
+# - Bank
 # =========================================================
 
 @app.put("/employees/{employee_id}")
@@ -1629,9 +1680,7 @@ def update_employee(
 
             status_code=400,
 
-            detail=(
-                "Invalid employee ID"
-            )
+            detail="Invalid employee ID"
 
         )
 
@@ -1659,6 +1708,22 @@ def update_employee(
         exclude_none=True
 
     )
+
+    # -----------------------------------------------------
+    # ADDRESS COMPATIBILITY
+    # -----------------------------------------------------
+
+    if "residential_address" in updates:
+
+        updates["address"] = (
+            updates["residential_address"]
+        )
+
+    elif "address" in updates:
+
+        updates["residential_address"] = (
+            updates["address"]
+        )
 
     # -----------------------------------------------------
     # SALARY VALIDATION
@@ -3573,7 +3638,9 @@ def get_my_leave_balance(
         })
 
         total_allocated += allocated
+
         total_used += leave_used
+
         total_remaining += remaining
 
     return {

@@ -10,28 +10,141 @@ export default function EmployeeProfile() {
 
   const [isMyProfile, setIsMyProfile] = useState(false);
 
+  // =====================================================
   // EDIT PROFILE
+  // =====================================================
+
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
+  // =====================================================
+  // FORM DATA
+  // =====================================================
+
   const [formData, setFormData] = useState({
+    // ---------------------------------------------------
+    // PERSONAL / PROFILE
+    // ---------------------------------------------------
+
     mobile: "",
+    date_of_birth: "",
+    residential_address: "",
+    nationality: "",
+
+    // ---------------------------------------------------
+    // RESUME
+    // ---------------------------------------------------
+
+    about: "",
+    skills: "",
+    certifications: "",
+    experience: "",
+
+    // ---------------------------------------------------
+    // WORK INFORMATION
+    // Displayed but Admin-controlled
+    // ---------------------------------------------------
+
     company: "",
     department: "",
     manager: "",
     location: "",
+
+    // ---------------------------------------------------
+    // BANK INFORMATION
+    // Employee can edit these
+    // ---------------------------------------------------
+
+    bank_name: "",
+    account_number: "",
+    ifsc_code: "",
   });
+
+  // =====================================================
+  // CREATE FORM DATA FROM EMPLOYEE
+  // =====================================================
+
+  function createFormData(data) {
+    return {
+      // -------------------------------------------------
+      // PERSONAL
+      // -------------------------------------------------
+
+      mobile: data.mobile || "",
+
+      date_of_birth:
+        data.date_of_birth || "",
+
+      residential_address:
+        data.residential_address ||
+        data.address ||
+        "",
+
+      nationality:
+        data.nationality || "",
+
+      // -------------------------------------------------
+      // RESUME
+      // -------------------------------------------------
+
+      about: data.about || "",
+
+      skills: data.skills || "",
+
+      certifications:
+        data.certifications || "",
+
+      experience:
+        data.experience || "",
+
+      // -------------------------------------------------
+      // WORK INFORMATION
+      // -------------------------------------------------
+
+      company:
+        data.company || "",
+
+      department:
+        data.department || "",
+
+      manager:
+        data.manager || "",
+
+      location:
+        data.location || "",
+
+      // -------------------------------------------------
+      // BANK INFORMATION
+      // -------------------------------------------------
+
+      bank_name:
+        data.bank_name || "",
+
+      account_number:
+        data.account_number || "",
+
+      ifsc_code:
+        data.ifsc_code || "",
+    };
+  }
+
+  // =====================================================
+  // LOAD PROFILE
+  // =====================================================
 
   useEffect(() => {
     async function loadProfile() {
       try {
         const token =
-          localStorage.getItem("dayflow_token");
+          localStorage.getItem(
+            "dayflow_token"
+          );
 
         const role =
-          localStorage.getItem("dayflow_role") ||
-          "employee";
+          localStorage.getItem(
+            "dayflow_role"
+          ) || "employee";
 
         if (!token) {
           throw new Error(
@@ -39,14 +152,9 @@ export default function EmployeeProfile() {
           );
         }
 
-        /*
-         * ADMIN
-         *
-         * If Admin clicked an employee card,
-         * selectedEmployee contains that employee.
-         *
-         * Otherwise Admin views their own profile.
-         */
+        // =================================================
+        // ADMIN VIEWING SELECTED EMPLOYEE
+        // =================================================
 
         if (role === "admin") {
           const selectedEmployee =
@@ -55,41 +163,56 @@ export default function EmployeeProfile() {
             );
 
           if (selectedEmployee) {
-            const parsedEmployee =
-              JSON.parse(selectedEmployee);
+            try {
+              const parsedEmployee =
+                JSON.parse(
+                  selectedEmployee
+                );
 
-            setEmployee(parsedEmployee);
-            setIsMyProfile(false);
+              setEmployee(
+                parsedEmployee
+              );
 
-            return;
+              setIsMyProfile(false);
+
+              setFormData(
+                createFormData(
+                  parsedEmployee
+                )
+              );
+
+              return;
+            } catch (parseError) {
+              console.error(
+                "Selected employee parse error:",
+                parseError
+              );
+
+              sessionStorage.removeItem(
+                "selectedEmployee"
+              );
+            }
           }
         }
 
-        /*
-         * EMPLOYEE
-         *
-         * Employees ALWAYS get their own
-         * profile from /me.
-         *
-         * We deliberately ignore selectedEmployee.
-         */
+        // =================================================
+        // EMPLOYEE / ADMIN OWN PROFILE
+        // =================================================
 
-        const data = await api("/me", {
-          token,
-        });
+        const data = await api(
+          "/me",
+          {
+            token,
+          }
+        );
 
         setEmployee(data);
+
         setIsMyProfile(true);
 
-        // Fill edit form with current data
-        setFormData({
-          mobile: data.mobile || "",
-          company: data.company || "",
-          department: data.department || "",
-          manager: data.manager || "",
-          location: data.location || "",
-        });
-
+        setFormData(
+          createFormData(data)
+        );
       } catch (error) {
         console.error(
           "Profile error:",
@@ -108,10 +231,77 @@ export default function EmployeeProfile() {
     loadProfile();
   }, []);
 
+  // =====================================================
+  // FORMAT CURRENCY
+  // =====================================================
 
-  /* ================================================= */
-  /* SAVE PROFILE */
-  /* ================================================= */
+  function formatCurrency(value) {
+    const amount = Number(
+      value || 0
+    );
+
+    return `₹${amount.toLocaleString(
+      "en-IN",
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }
+    )}`;
+  }
+
+  // =====================================================
+  // MASK ACCOUNT NUMBER
+  // =====================================================
+
+  function maskAccountNumber(
+    accountNumber
+  ) {
+    if (!accountNumber) {
+      return "Not provided";
+    }
+
+    const value =
+      String(accountNumber);
+
+    if (value.length <= 4) {
+      return value;
+    }
+
+    return `•••• ${value.slice(-4)}`;
+  }
+
+  // =====================================================
+  // UPDATE FORM FIELD
+  // =====================================================
+
+  function updateFormField(
+    field,
+    value
+  ) {
+    setFormData((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  }
+
+  // =====================================================
+  // START EDITING
+  // =====================================================
+
+  function handleStartEditing() {
+    setSaveMessage("");
+    setError("");
+
+    setFormData(
+      createFormData(employee)
+    );
+
+    setEditing(true);
+  }
+
+  // =====================================================
+  // SAVE PROFILE
+  // =====================================================
 
   async function handleSaveProfile() {
     try {
@@ -120,7 +310,9 @@ export default function EmployeeProfile() {
       setError("");
 
       const token =
-        localStorage.getItem("dayflow_token");
+        localStorage.getItem(
+          "dayflow_token"
+        );
 
       if (!token) {
         throw new Error(
@@ -128,38 +320,78 @@ export default function EmployeeProfile() {
         );
       }
 
-      const updatedEmployee = await api(
-        "/me/profile",
-        {
-          method: "PUT",
-          token,
-          body: formData,
-        }
+      // =================================================
+      // ONLY SEND EMPLOYEE-EDITABLE FIELDS
+      //
+      // This prevents accidental attempts to modify
+      // company / department / manager / location.
+      // =================================================
+
+      const employeeUpdates = {
+        mobile:
+          formData.mobile,
+
+        date_of_birth:
+          formData.date_of_birth,
+
+        address:
+          formData.residential_address,
+
+        about:
+          formData.about,
+
+        skills:
+          formData.skills,
+
+        certifications:
+          formData.certifications,
+
+        experience:
+          formData.experience,
+
+        nationality:
+          formData.nationality,
+
+        // BANK INFORMATION
+        bank_name:
+          formData.bank_name,
+
+        account_number:
+          formData.account_number,
+
+        ifsc_code:
+          formData.ifsc_code,
+      };
+
+      const updatedEmployee =
+        await api(
+          "/me/profile",
+          {
+            method: "PUT",
+            token,
+            body: employeeUpdates,
+          }
+        );
+
+      // =================================================
+      // API RETURNS employee_response()
+      // =================================================
+
+      setEmployee(
+        updatedEmployee
       );
 
-      // Update displayed profile
-      setEmployee(updatedEmployee);
-
-      // Update form with saved values
-      setFormData({
-        mobile:
-          updatedEmployee.mobile || "",
-        company:
-          updatedEmployee.company || "",
-        department:
-          updatedEmployee.department || "",
-        manager:
-          updatedEmployee.manager || "",
-        location:
-          updatedEmployee.location || "",
-      });
+      setFormData(
+        createFormData(
+          updatedEmployee
+        )
+      );
 
       setEditing(false);
 
       setSaveMessage(
         "Profile updated successfully."
       );
-
     } catch (error) {
       console.error(
         "Profile update error:",
@@ -175,29 +407,38 @@ export default function EmployeeProfile() {
     }
   }
 
-
-  /* ================================================= */
-  /* CANCEL EDITING */
-  /* ================================================= */
+  // =====================================================
+  // CANCEL EDITING
+  // =====================================================
 
   function handleCancelEdit() {
     setEditing(false);
+
     setSaveMessage("");
+
     setError("");
 
-    setFormData({
-      mobile: employee.mobile || "",
-      company: employee.company || "",
-      department: employee.department || "",
-      manager: employee.manager || "",
-      location: employee.location || "",
-    });
+    setFormData(
+      createFormData(employee)
+    );
   }
 
+  // =====================================================
+  // GO BACK TO DASHBOARD
+  // =====================================================
 
-  /* ================================================= */
-  /* LOADING */
-  /* ================================================= */
+  function goBackToDashboard() {
+    sessionStorage.removeItem(
+      "selectedEmployee"
+    );
+
+    window.location.href =
+      "/dashboard";
+  }
+
+  // =====================================================
+  // LOADING
+  // =====================================================
 
   if (loading) {
     return (
@@ -207,10 +448,9 @@ export default function EmployeeProfile() {
     );
   }
 
-
-  /* ================================================= */
-  /* ERROR */
-  /* ================================================= */
+  // =====================================================
+  // ERROR
+  // =====================================================
 
   if (error && !employee) {
     return (
@@ -229,7 +469,6 @@ export default function EmployeeProfile() {
       </div>
     );
   }
-
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
@@ -256,20 +495,14 @@ export default function EmployeeProfile() {
 
           </div>
 
-
           {/* NAVIGATION */}
 
           <nav className="hidden items-center gap-2 md:flex">
 
             <button
-              onClick={() => {
-                sessionStorage.removeItem(
-                  "selectedEmployee"
-                );
-
-                window.location.href =
-                  "/dashboard";
-              }}
+              onClick={
+                goBackToDashboard
+              }
               className="rounded-lg px-4 py-2 text-sm text-neutral-400 hover:bg-neutral-800 hover:text-white"
             >
               Employees
@@ -289,13 +522,14 @@ export default function EmployeeProfile() {
 
           </nav>
 
-
           {/* PROFILE AVATAR */}
 
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-600 font-semibold">
-            {employee.name
-              ?.charAt(0)
+
+            {(employee.name || "E")
+              .charAt(0)
               .toUpperCase()}
+
           </div>
 
         </div>
@@ -304,24 +538,21 @@ export default function EmployeeProfile() {
 
 
       {/* ================================================= */}
-      {/* PROFILE */}
+      {/* MAIN PROFILE */}
       {/* ================================================= */}
 
       <main className="mx-auto max-w-5xl px-6 py-8">
 
+        {/* ================================================= */}
         {/* PAGE TITLE */}
+        {/* ================================================= */}
 
         <div className="mb-6">
 
           <button
-            onClick={() => {
-              sessionStorage.removeItem(
-                "selectedEmployee"
-              );
-
-              window.location.href =
-                "/dashboard";
-            }}
+            onClick={
+              goBackToDashboard
+            }
             className="mb-5 text-sm text-neutral-400 hover:text-white"
           >
             ← Back to Employees
@@ -335,68 +566,86 @@ export default function EmployeeProfile() {
                 : "Employee Profile"}
             </h1>
 
+            {/* ================================================= */}
+            {/* EDIT PROFILE BUTTON */}
+            {/* ================================================= */}
 
-            {/* EDIT BUTTON ONLY FOR OWN PROFILE */}
+            {isMyProfile &&
+              !editing && (
 
-            {isMyProfile && !editing && (
-              <button
-                onClick={() => {
-                  setSaveMessage("");
-                  setError("");
-                  setEditing(true);
-                }}
-                className="rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-medium hover:bg-purple-500"
-              >
-                Edit Profile
-              </button>
-            )}
+                <button
+                  onClick={
+                    handleStartEditing
+                  }
+                  className="rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-medium hover:bg-purple-500"
+                >
+                  Edit Profile
+                </button>
+
+              )}
 
           </div>
 
 
-          {/* SAVE / CANCEL BUTTONS */}
+          {/* ================================================= */}
+          {/* SAVE / CANCEL */}
+          {/* ================================================= */}
 
-          {isMyProfile && editing && (
-            <div className="mt-4 flex gap-3">
+          {isMyProfile &&
+            editing && (
 
-              <button
-                onClick={handleSaveProfile}
-                disabled={saving}
-                className="rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-medium hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving
-                  ? "Saving..."
-                  : "Save Changes"}
-              </button>
+              <div className="mt-4 flex flex-wrap gap-3">
+
+                <button
+                  onClick={
+                    handleSaveProfile
+                  }
+                  disabled={saving}
+                  className="rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-medium hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving
+                    ? "Saving..."
+                    : "Save Changes"}
+                </button>
+
+                <button
+                  onClick={
+                    handleCancelEdit
+                  }
+                  disabled={saving}
+                  className="rounded-xl border border-neutral-700 px-5 py-2.5 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+              </div>
+
+            )}
 
 
-              <button
-                onClick={handleCancelEdit}
-                disabled={saving}
-                className="rounded-xl border border-neutral-700 px-5 py-2.5 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-
-            </div>
-          )}
-
-
+          {/* ================================================= */}
           {/* SUCCESS MESSAGE */}
+          {/* ================================================= */}
 
           {saveMessage && (
+
             <div className="mt-4 rounded-lg border border-green-900 bg-green-950/30 px-4 py-3 text-sm text-green-400">
               {saveMessage}
             </div>
+
           )}
 
 
+          {/* ================================================= */}
           {/* ERROR MESSAGE */}
+          {/* ================================================= */}
 
           {error && employee && (
+
             <div className="mt-4 rounded-lg border border-red-900 bg-red-950/30 px-4 py-3 text-sm text-red-400">
               {error}
             </div>
+
           )}
 
         </div>
@@ -413,9 +662,11 @@ export default function EmployeeProfile() {
             {/* AVATAR */}
 
             <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full bg-neutral-700 text-4xl font-semibold">
+
               {(employee.name || "E")
                 .charAt(0)
                 .toUpperCase()}
+
             </div>
 
 
@@ -430,6 +681,7 @@ export default function EmployeeProfile() {
 
               <p className="mt-1 text-neutral-400">
                 {employee.jobPosition ||
+                  employee.job_position ||
                   "Employee"}
               </p>
 
@@ -446,7 +698,7 @@ export default function EmployeeProfile() {
                     Email
                   </p>
 
-                  <p className="mt-1 text-sm">
+                  <p className="mt-1 break-all text-sm">
                     {employee.email ||
                       "Not provided"}
                   </p>
@@ -462,17 +714,19 @@ export default function EmployeeProfile() {
                     Mobile
                   </p>
 
-                  {editing && isMyProfile ? (
+                  {editing &&
+                  isMyProfile ? (
 
                     <input
                       type="text"
-                      value={formData.mobile}
+                      value={
+                        formData.mobile
+                      }
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          mobile:
-                            e.target.value,
-                        })
+                        updateFormField(
+                          "mobile",
+                          e.target.value
+                        )
                       }
                       className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
                       placeholder="Mobile number"
@@ -497,7 +751,7 @@ export default function EmployeeProfile() {
 
 
           {/* ================================================= */}
-          {/* COMPANY INFORMATION */}
+          {/* WORK INFORMATION */}
           {/* ================================================= */}
 
           <div className="mt-8 grid grid-cols-1 gap-5 border-t border-neutral-800 pt-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -510,30 +764,10 @@ export default function EmployeeProfile() {
                 Company
               </p>
 
-              {editing && isMyProfile ? (
-
-                <input
-                  type="text"
-                  value={formData.company}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      company:
-                        e.target.value,
-                    })
-                  }
-                  className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                  placeholder="Company"
-                />
-
-              ) : (
-
-                <p className="mt-1 text-sm">
-                  {employee.company ||
-                    "Not provided"}
-                </p>
-
-              )}
+              <p className="mt-1 text-sm">
+                {employee.company ||
+                  "Not provided"}
+              </p>
 
             </div>
 
@@ -546,30 +780,10 @@ export default function EmployeeProfile() {
                 Department
               </p>
 
-              {editing && isMyProfile ? (
-
-                <input
-                  type="text"
-                  value={formData.department}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      department:
-                        e.target.value,
-                    })
-                  }
-                  className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                  placeholder="Department"
-                />
-
-              ) : (
-
-                <p className="mt-1 text-sm">
-                  {employee.department ||
-                    "Not provided"}
-                </p>
-
-              )}
+              <p className="mt-1 text-sm">
+                {employee.department ||
+                  "Not provided"}
+              </p>
 
             </div>
 
@@ -582,30 +796,10 @@ export default function EmployeeProfile() {
                 Manager
               </p>
 
-              {editing && isMyProfile ? (
-
-                <input
-                  type="text"
-                  value={formData.manager}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      manager:
-                        e.target.value,
-                    })
-                  }
-                  className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                  placeholder="Manager"
-                />
-
-              ) : (
-
-                <p className="mt-1 text-sm">
-                  {employee.manager ||
-                    "Not provided"}
-                </p>
-
-              )}
+              <p className="mt-1 text-sm">
+                {employee.manager ||
+                  "Not provided"}
+              </p>
 
             </div>
 
@@ -618,30 +812,10 @@ export default function EmployeeProfile() {
                 Location
               </p>
 
-              {editing && isMyProfile ? (
-
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      location:
-                        e.target.value,
-                    })
-                  }
-                  className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                  placeholder="Location"
-                />
-
-              ) : (
-
-                <p className="mt-1 text-sm">
-                  {employee.location ||
-                    "Not provided"}
-                </p>
-
-              )}
+              <p className="mt-1 text-sm">
+                {employee.location ||
+                  "Not provided"}
+              </p>
 
             </div>
 
@@ -656,7 +830,9 @@ export default function EmployeeProfile() {
 
         <section className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900">
 
+          {/* ================================================= */}
           {/* TAB BUTTONS */}
+          {/* ================================================= */}
 
           <div className="flex overflow-x-auto border-b border-neutral-800">
 
@@ -664,9 +840,11 @@ export default function EmployeeProfile() {
 
             <button
               onClick={() =>
-                setActiveTab("resume")
+                setActiveTab(
+                  "resume"
+                )
               }
-              className={`px-6 py-4 text-sm font-medium ${
+              className={`whitespace-nowrap px-6 py-4 text-sm font-medium ${
                 activeTab === "resume"
                   ? "border-b-2 border-purple-500 text-purple-400"
                   : "text-neutral-400 hover:text-white"
@@ -680,9 +858,11 @@ export default function EmployeeProfile() {
 
             <button
               onClick={() =>
-                setActiveTab("private")
+                setActiveTab(
+                  "private"
+                )
               }
-              className={`px-6 py-4 text-sm font-medium ${
+              className={`whitespace-nowrap px-6 py-4 text-sm font-medium ${
                 activeTab === "private"
                   ? "border-b-2 border-purple-500 text-purple-400"
                   : "text-neutral-400 hover:text-white"
@@ -696,9 +876,11 @@ export default function EmployeeProfile() {
 
             <button
               onClick={() =>
-                setActiveTab("salary")
+                setActiveTab(
+                  "salary"
+                )
               }
-              className={`px-6 py-4 text-sm font-medium ${
+              className={`whitespace-nowrap px-6 py-4 text-sm font-medium ${
                 activeTab === "salary"
                   ? "border-b-2 border-purple-500 text-purple-400"
                   : "text-neutral-400 hover:text-white"
@@ -716,6 +898,7 @@ export default function EmployeeProfile() {
 
           <div className="p-6">
 
+
             {/* ================================================= */}
             {/* RESUME */}
             {/* ================================================= */}
@@ -726,16 +909,38 @@ export default function EmployeeProfile() {
 
                 {/* ABOUT */}
 
-                <div className="rounded-xl border border-neutral-800 p-5">
+                <div className="rounded-xl border border-neutral-800 p-5 md:col-span-2">
 
                   <h3 className="font-medium">
                     About
                   </h3>
 
-                  <p className="mt-3 text-sm leading-6 text-neutral-400">
-                    Employee information and professional
-                    background will appear here.
-                  </p>
+                  {editing &&
+                  isMyProfile ? (
+
+                    <textarea
+                      value={
+                        formData.about
+                      }
+                      onChange={(e) =>
+                        updateFormField(
+                          "about",
+                          e.target.value
+                        )
+                      }
+                      rows={5}
+                      placeholder="Tell us about yourself, your professional background, experience, interests, etc."
+                      className="mt-3 w-full resize-y rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-3 text-sm text-white outline-none focus:border-purple-500"
+                    />
+
+                  ) : (
+
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-neutral-400">
+                      {employee.about ||
+                        "No information added yet."}
+                    </p>
+
+                  )}
 
                 </div>
 
@@ -748,9 +953,79 @@ export default function EmployeeProfile() {
                     Skills
                   </h3>
 
-                  <p className="mt-3 text-sm text-neutral-500">
-                    No skills added yet.
-                  </p>
+                  {editing &&
+                  isMyProfile ? (
+
+                    <textarea
+                      value={
+                        formData.skills
+                      }
+                      onChange={(e) =>
+                        updateFormField(
+                          "skills",
+                          e.target.value
+                        )
+                      }
+                      rows={5}
+                      placeholder="Example: React, Python, MongoDB, Communication"
+                      className="mt-3 w-full resize-y rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-3 text-sm text-white outline-none focus:border-purple-500"
+                    />
+
+                  ) : (
+
+                    <div className="mt-3">
+
+                      {employee.skills ? (
+
+                        <div className="flex flex-wrap gap-2">
+
+                          {String(
+                            employee.skills
+                          )
+                            .split(",")
+                            .map(
+                              (
+                                skill,
+                                index
+                              ) => {
+
+                                const cleanSkill =
+                                  skill.trim();
+
+                                if (
+                                  !cleanSkill
+                                ) {
+                                  return null;
+                                }
+
+                                return (
+                                  <span
+                                    key={
+                                      index
+                                    }
+                                    className="rounded-full border border-purple-800 bg-purple-950/30 px-3 py-1 text-xs text-purple-300"
+                                  >
+                                    {
+                                      cleanSkill
+                                    }
+                                  </span>
+                                );
+                              }
+                            )}
+
+                        </div>
+
+                      ) : (
+
+                        <p className="text-sm text-neutral-500">
+                          No skills added yet.
+                        </p>
+
+                      )}
+
+                    </div>
+
+                  )}
 
                 </div>
 
@@ -763,9 +1038,117 @@ export default function EmployeeProfile() {
                     Certifications
                   </h3>
 
-                  <p className="mt-3 text-sm text-neutral-500">
-                    No certifications added yet.
-                  </p>
+                  {editing &&
+                  isMyProfile ? (
+
+                    <textarea
+                      value={
+                        formData.certifications
+                      }
+                      onChange={(e) =>
+                        updateFormField(
+                          "certifications",
+                          e.target.value
+                        )
+                      }
+                      rows={5}
+                      placeholder="Example: AWS Certified Developer, Google Data Analytics"
+                      className="mt-3 w-full resize-y rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-3 text-sm text-white outline-none focus:border-purple-500"
+                    />
+
+                  ) : (
+
+                    <div className="mt-3">
+
+                      {employee.certifications ? (
+
+                        <div className="space-y-2">
+
+                          {String(
+                            employee.certifications
+                          )
+                            .split(",")
+                            .map(
+                              (
+                                certification,
+                                index
+                              ) => {
+
+                                const cleanCertification =
+                                  certification.trim();
+
+                                if (
+                                  !cleanCertification
+                                ) {
+                                  return null;
+                                }
+
+                                return (
+                                  <div
+                                    key={
+                                      index
+                                    }
+                                    className="rounded-lg bg-neutral-950 px-3 py-2 text-sm text-neutral-300"
+                                  >
+                                    {
+                                      cleanCertification
+                                    }
+                                  </div>
+                                );
+                              }
+                            )}
+
+                        </div>
+
+                      ) : (
+
+                        <p className="text-sm text-neutral-500">
+                          No certifications added yet.
+                        </p>
+
+                      )}
+
+                    </div>
+
+                  )}
+
+                </div>
+
+
+                {/* EXPERIENCE */}
+
+                <div className="rounded-xl border border-neutral-800 p-5 md:col-span-2">
+
+                  <h3 className="font-medium">
+                    Experience
+                  </h3>
+
+                  {editing &&
+                  isMyProfile ? (
+
+                    <textarea
+                      value={
+                        formData.experience
+                      }
+                      onChange={(e) =>
+                        updateFormField(
+                          "experience",
+                          e.target.value
+                        )
+                      }
+                      rows={5}
+                      placeholder="Describe your previous work experience."
+                      className="mt-3 w-full resize-y rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-3 text-sm text-white outline-none focus:border-purple-500"
+                    />
+
+                  ) : (
+
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-neutral-400">
+                      {employee.experience ||
+                        "No experience added yet."}
+                    </p>
+
+                  )}
 
                 </div>
 
@@ -780,81 +1163,278 @@ export default function EmployeeProfile() {
 
             {activeTab === "private" && (
 
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <div className="space-y-6">
 
                 <div>
 
-                  <p className="text-xs text-neutral-500">
-                    Date of Birth
-                  </p>
+                  <h3 className="text-lg font-semibold">
+                    Private Information
+                  </h3>
 
-                  <p className="mt-1 text-sm">
-                    Not provided
+                  <p className="mt-1 text-sm text-neutral-500">
+                    Personal and bank information
+                    maintained by you.
                   </p>
 
                 </div>
 
 
-                <div>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
 
-                  <p className="text-xs text-neutral-500">
-                    Bank Details
-                  </p>
+                  {/* DATE OF BIRTH */}
 
-                  <p className="mt-1 text-sm">
-                    Not provided
-                  </p>
+                  <div className="rounded-xl border border-neutral-800 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      Date of Birth
+                    </p>
+
+                    {editing &&
+                    isMyProfile ? (
+
+                      <input
+                        type="date"
+                        value={
+                          formData.date_of_birth
+                        }
+                        onChange={(e) =>
+                          updateFormField(
+                            "date_of_birth",
+                            e.target.value
+                          )
+                        }
+                        className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                      />
+
+                    ) : (
+
+                      <p className="mt-2 text-sm">
+                        {employee.date_of_birth ||
+                          "Not provided"}
+                      </p>
+
+                    )}
+
+                  </div>
+
+
+                  {/* RESIDENTIAL ADDRESS */}
+
+                  <div className="rounded-xl border border-neutral-800 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      Residential Address
+                    </p>
+
+                    {editing &&
+                    isMyProfile ? (
+
+                      <textarea
+                        value={
+                          formData.residential_address
+                        }
+                        onChange={(e) =>
+                          updateFormField(
+                            "residential_address",
+                            e.target.value
+                          )
+                        }
+                        rows={3}
+                        placeholder="Enter your residential address"
+                        className="mt-2 w-full resize-y rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                      />
+
+                    ) : (
+
+                      <p className="mt-2 whitespace-pre-wrap text-sm">
+                        {employee.residential_address ||
+                          employee.address ||
+                          "Not provided"}
+                      </p>
+
+                    )}
+
+                  </div>
+
+
+                  {/* NATIONALITY */}
+
+                  <div className="rounded-xl border border-neutral-800 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      Nationality
+                    </p>
+
+                    {editing &&
+                    isMyProfile ? (
+
+                      <input
+                        type="text"
+                        value={
+                          formData.nationality
+                        }
+                        onChange={(e) =>
+                          updateFormField(
+                            "nationality",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Nationality"
+                        className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                      />
+
+                    ) : (
+
+                      <p className="mt-2 text-sm">
+                        {employee.nationality ||
+                          "Not provided"}
+                      </p>
+
+                    )}
+
+                  </div>
+
+
+                  {/* ================================================= */}
+                  {/* BANK NAME */}
+                  {/* ================================================= */}
+
+                  <div className="rounded-xl border border-neutral-800 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      Bank Name
+                    </p>
+
+                    {editing &&
+                    isMyProfile ? (
+
+                      <input
+                        type="text"
+                        value={
+                          formData.bank_name
+                        }
+                        onChange={(e) =>
+                          updateFormField(
+                            "bank_name",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Enter bank name"
+                        className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                      />
+
+                    ) : (
+
+                      <p className="mt-2 text-sm">
+                        {employee.bank_name ||
+                          "Not provided"}
+                      </p>
+
+                    )}
+
+                  </div>
+
+
+                  {/* ================================================= */}
+                  {/* ACCOUNT NUMBER */}
+                  {/* ================================================= */}
+
+                  <div className="rounded-xl border border-neutral-800 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      Account Number
+                    </p>
+
+                    {editing &&
+                    isMyProfile ? (
+
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={
+                          formData.account_number
+                        }
+                        onChange={(e) =>
+                          updateFormField(
+                            "account_number",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Enter account number"
+                        className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                      />
+
+                    ) : (
+
+                      <p className="mt-2 text-sm">
+                        {maskAccountNumber(
+                          employee.account_number
+                        )}
+                      </p>
+
+                    )}
+
+                  </div>
+
+
+                  {/* ================================================= */}
+                  {/* IFSC CODE */}
+                  {/* ================================================= */}
+
+                  <div className="rounded-xl border border-neutral-800 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      IFSC Code
+                    </p>
+
+                    {editing &&
+                    isMyProfile ? (
+
+                      <input
+                        type="text"
+                        value={
+                          formData.ifsc_code
+                        }
+                        onChange={(e) =>
+                          updateFormField(
+                            "ifsc_code",
+                            e.target.value.toUpperCase()
+                          )
+                        }
+                        placeholder="Example: SBIN0001234"
+                        className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm uppercase text-white outline-none focus:border-purple-500"
+                      />
+
+                    ) : (
+
+                      <p className="mt-2 text-sm">
+                        {employee.ifsc_code ||
+                          "Not provided"}
+                      </p>
+
+                    )}
+
+                  </div>
 
                 </div>
 
 
-                <div>
+                {/* ================================================= */}
+                {/* INFORMATION MESSAGE */}
+                {/* ================================================= */}
 
-                  <p className="text-xs text-neutral-500">
-                    Residential Address
+                <div className="rounded-xl border border-neutral-800 bg-neutral-950 px-5 py-4">
+
+                  <p className="text-sm text-neutral-400">
+                    You can edit your personal and
+                    bank information from the
+                    Edit Profile button.
                   </p>
 
-                  <p className="mt-1 text-sm">
-                    Not provided
-                  </p>
-
-                </div>
-
-
-                <div>
-
-                  <p className="text-xs text-neutral-500">
-                    Account Number
-                  </p>
-
-                  <p className="mt-1 text-sm">
-                    Not provided
-                  </p>
-
-                </div>
-
-
-                <div>
-
-                  <p className="text-xs text-neutral-500">
-                    Nationality
-                  </p>
-
-                  <p className="mt-1 text-sm">
-                    Not provided
-                  </p>
-
-                </div>
-
-
-                <div>
-
-                  <p className="text-xs text-neutral-500">
-                    Bank Name
-                  </p>
-
-                  <p className="mt-1 text-sm">
-                    Not provided
+                  <p className="mt-1 text-xs text-neutral-600">
+                    Account numbers are partially
+                    hidden when you are not editing
+                    your profile.
                   </p>
 
                 </div>
@@ -865,39 +1445,151 @@ export default function EmployeeProfile() {
 
 
             {/* ================================================= */}
-            {/* SALARY */}
+            {/* SALARY INFO */}
             {/* ================================================= */}
 
             {activeTab === "salary" && (
 
-              <div className="rounded-xl border border-neutral-800 p-6">
+              <div className="space-y-6">
 
-                {employee.role === "admin" ? (
+                {/* SALARY HEADER */}
 
-                  <>
-                    <p className="text-sm text-neutral-400">
-                      Salary information can be managed by authorized Admin/HR users.
+                <div>
+
+                  <h3 className="text-lg font-semibold">
+                    Salary Information
+                  </h3>
+
+                  <p className="mt-1 text-sm text-neutral-500">
+                    Your current salary details.
+                  </p>
+
+                </div>
+
+
+                {/* SALARY GRID */}
+
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+
+                  {/* BASIC SALARY */}
+
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      Basic Salary
                     </p>
 
-                    <p className="mt-2 text-xs text-neutral-600">
-                      Salary management functionality will be added next.
-                    </p>
-                  </>
-
-                ) : (
-
-                  <>
-                    <p className="text-sm text-neutral-400">
-                      Salary information is restricted.
+                    <p className="mt-2 text-2xl font-semibold">
+                      {formatCurrency(
+                        employee.basic_salary
+                      )}
                     </p>
 
-                    <p className="mt-2 text-xs text-neutral-600">
-                      Salary details will only be displayed
-                      to authorized Admin/HR users.
-                    </p>
-                  </>
+                  </div>
 
-                )}
+
+                  {/* HRA */}
+
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      HRA
+                    </p>
+
+                    <p className="mt-2 text-2xl font-semibold">
+                      {formatCurrency(
+                        employee.hra
+                      )}
+                    </p>
+
+                  </div>
+
+
+                  {/* ALLOWANCES */}
+
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      Allowances
+                    </p>
+
+                    <p className="mt-2 text-2xl font-semibold">
+                      {formatCurrency(
+                        employee.allowances
+                      )}
+                    </p>
+
+                  </div>
+
+
+                  {/* GROSS SALARY */}
+
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      Gross Salary
+                    </p>
+
+                    <p className="mt-2 text-2xl font-semibold">
+                      {formatCurrency(
+                        employee.gross_salary
+                      )}
+                    </p>
+
+                  </div>
+
+
+                  {/* DEDUCTIONS */}
+
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
+
+                    <p className="text-xs text-neutral-500">
+                      Deductions
+                    </p>
+
+                    <p className="mt-2 text-2xl font-semibold">
+                      {formatCurrency(
+                        employee.deductions
+                      )}
+                    </p>
+
+                  </div>
+
+
+                  {/* NET SALARY */}
+
+                  <div className="rounded-xl border border-purple-800 bg-purple-950/20 p-5">
+
+                    <p className="text-xs text-purple-400">
+                      Net Salary
+                    </p>
+
+                    <p className="mt-2 text-3xl font-semibold text-purple-300">
+                      {formatCurrency(
+                        employee.net_salary
+                      )}
+                    </p>
+
+                  </div>
+
+                </div>
+
+
+                {/* SALARY INFORMATION */}
+
+                <div className="rounded-xl border border-neutral-800 bg-neutral-950 px-5 py-4">
+
+                  <p className="text-sm text-neutral-400">
+                    Salary information is managed
+                    by Admin.
+                  </p>
+
+                  <p className="mt-1 text-xs text-neutral-600">
+                    You can view your salary details
+                    here, but you cannot modify them.
+                  </p>
+
+                </div>
 
               </div>
 
